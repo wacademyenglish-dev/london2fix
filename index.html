@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>WOLF LABS | Route 02: Transit Control (A1)</title>
+    
+    <!-- Fonts: Outfit (UI), JetBrains Mono (Data/Tech), Space Grotesk (Headers) -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        tubeBg: '#050505',
+                        tubePanel: '#111111',
+                        tubeHover: '#1c1c1c',    
+                        tubeRed: '#dc241f',      
+                        tubeBlue: '#0019a8',     
+                        tubeYellow: '#ffd329',   
+                        tubeGreen: '#007a33',    
+                        tubeWhite: '#f8fafc',
+                        tubeMuted: '#94a3b8'
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        heading: ['"Space Grotesk"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* HARDCODED DARK BACKGROUND TO PREVENT WHITE FLASHES */
+        html, body { 
+            background-color: #050505 !important; 
+            color: #f8fafc !important; 
+            overflow: hidden; 
+            font-family: 'Outfit', sans-serif; 
+            user-select: none; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --tube-bg: #050505;
+            --tube-panel: #111111;
+            --tube-hover: #1c1c1c;
+            --tube-red: #dc241f;
+            --tube-blue: #0019a8;
+            --tube-yellow: #ffd329;
+            --tube-green: #007a33;
+            --tube-white: #f8fafc;
+            --tube-muted: #94a3b8;
+        }
+
+        /* TRANSIT BACKGROUNDS */
+        .transit-grid {
+            position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0.1;
+            background-image: 
+                linear-gradient(45deg, #27272a 25%, transparent 25%, transparent 75%, #27272a 75%, #27272a),
+                linear-gradient(45deg, #27272a 25%, transparent 25%, transparent 75%, #27272a 75%, #27272a);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+        .tube-glow {
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            background: radial-gradient(circle at 10% 20%, rgba(220, 36, 31, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 90% 80%, rgba(0, 25, 168, 0.15) 0%, transparent 50%);
+        }
+
+        /* UI ELEMENTS */
+        .tube-panel {
+            background: rgba(17, 17, 17, 0.85);
+            border: 1px solid #333;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.02);
+            position: relative;
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+        }
+
+        /* HUD TOP */
+        #hud-top {
+            position: fixed; top: 0; left: 0; right: 0; padding: 15px 30px;
+            background: rgba(5, 5, 5, 0.95); border-bottom: 2px solid var(--tube-blue);
+            z-index: 1000; box-shadow: 0 4px 30px rgba(0,25,168,0.3);
+            backdrop-filter: blur(10px);
+        }
+        .hud-bar-container { width: 140px; height: 6px; background: #27272a; border-radius: 4px; overflow: hidden; border: 1px solid #3f3f46;}
+        .hud-bar-fill { height: 100%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px currentColor;}
+
+        /* CONTENT ARENA */
+        #mission-arena { height: 100vh; padding-bottom: 120px; padding-top: 80px; position: relative; z-index: 10; }
+
+        /* BUTTONS */
+        .btn-tube {
+            background: var(--tube-red); color: #ffffff; font-family: 'Space Grotesk', sans-serif; font-weight: 900;
+            padding: 16px 40px; border-radius: 50px; transition: all 0.3s; text-transform: uppercase; letter-spacing: 2px;
+            box-shadow: 0 8px 25px rgba(220, 36, 31, 0.4); border: none; font-size: 1.1rem;
+        }
+        .btn-tube:hover { background: #b01c18; transform: translateY(-3px); box-shadow: 0 12px 30px rgba(220, 36, 31, 0.6); }
+        .btn-tube:active { transform: translateY(1px); }
+
+        .btn-tube-outline {
+            background: rgba(0, 25, 168, 0.1); color: #f4f4f5; font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+            padding: 14px 32px; border-radius: 50px; transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px;
+            border: 2px solid var(--tube-blue); cursor: pointer;
+        }
+        .btn-tube-outline:hover { background: var(--tube-blue); transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,25,168,0.4);}
+
+        /* SLIDER */
+        input[type=range].tube-slider { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range].tube-slider::-webkit-slider-runnable-track { width: 100%; height: 10px; cursor: pointer; background: #27272a; border-radius: 5px; border: 1px solid #333;}
+        input[type=range].tube-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 28px; width: 28px; border-radius: 50%; background: var(--tube-yellow); cursor: pointer; margin-top: -10px; box-shadow: 0 0 15px rgba(255, 211, 41, 0.5); transition: transform 0.2s; border: 3px solid var(--tube-bg); }
+        input[type=range].tube-slider::-webkit-slider-thumb:hover { transform: scale(1.1); background: #fff;}
+
+        /* CUSTOM MECHANIC: THE TRACK SWITCHER */
+        .track-container { position: relative; width: 100%; height: 160px; display: flex; align-items: center; justify-content: space-between; margin: 2rem 0; }
+        .track-line-bg { position: absolute; top: 50%; left: 0; width: 100%; height: 12px; background: #27272a; transform: translateY(-50%); border-radius: 6px; z-index: 1; border: 1px solid #333;}
+        .track-light { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: var(--tube-yellow); border-radius: 6px; transition: width 0.8s ease-in-out; box-shadow: 0 0 20px currentColor;}
+        
+        .track-node { z-index: 10; background: var(--tube-panel); border: 4px solid var(--tube-white); padding: 1.5rem 2rem; border-radius: 50px; font-family: 'Outfit', sans-serif; font-weight: bold; font-size: 1.3rem; box-shadow: 0 10px 30px rgba(0,0,0,0.8); min-width: 200px; text-align: center; }
+        
+        .track-dropzone { z-index: 10; width: 140px; height: 70px; background: rgba(5,5,5,0.95); border: 4px dashed #3f3f46; border-radius: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.3s; font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 1.5rem;}
+        .track-dropzone.drag-over { background: rgba(255,211,41,0.1); border-color: var(--tube-yellow); transform: scale(1.05);}
+        .track-dropzone.filled { border-style: solid; border-color: var(--tube-yellow); background: var(--tube-yellow); color: #000; box-shadow: 0 0 30px rgba(255,211,41,0.4);}
+        .track-dropzone.filled-error { border-style: solid; border-color: var(--tube-red); background: var(--tube-red); color: #fff; box-shadow: 0 0 30px rgba(220,36,31,0.4);}
+
+        .track-pill { background: #111; color: #fff; border: 2px solid #3f3f46; border-bottom: 4px solid #3f3f46; padding: 1rem 2rem; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 1.5rem; cursor: grab; transition: all 0.2s; display: inline-block; user-select: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);}
+        .track-pill:hover { transform: translateY(-4px); border-color: var(--tube-white); border-bottom-color: var(--tube-white); color: var(--tube-white); box-shadow: 0 10px 25px rgba(255,255,255,0.1);}
+        .track-pill.dragging { opacity: 0.5; transform: scale(1.05); }
+
+        .train-icon { position: absolute; left: 0; top: 50%; transform: translate(-50%, -50%); font-size: 4rem; color: #fff; z-index: 20; opacity: 0; filter: drop-shadow(0 0 15px rgba(255,255,255,0.8)); transition: opacity 0.2s;}
+        .run-train { animation: trainZoom 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; opacity: 1 !important;}
+        @keyframes trainZoom {
+            0% { left: 0%; transform: translate(-100%, -50%); }
+            15% { left: 15%; transform: translate(-50%, -50%); }
+            100% { left: 120%; transform: translate(0%, -50%); }
+        }
+
+        /* VOCAB MATCH (VISUAL DRAG & DROP) */
+        .vocab-word { background: var(--tube-panel); border: 1px solid #333; color: var(--tube-white); padding: 1rem 1.5rem; font-family: 'JetBrains Mono', monospace; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 8px; cursor: grab; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: all 0.2s ease; user-select: none; font-size: 1.1rem; }
+        .vocab-word:hover { border-color: var(--tube-yellow); color: var(--tube-yellow); transform: translateY(-3px); box-shadow: 0 8px 20px rgba(255,211,41,0.2); }
+        .vocab-word.dragging { opacity: 0.5; transform: scale(1.05); }
+        .vocab-match-dropzone { width: 100%; height: 50px; border: 2px dashed #3f3f46; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); transition: all 0.3s ease; color: #52525b; font-weight: bold; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 2px; font-size: 0.9rem;}
+        .vocab-match-dropzone.drag-over { background-color: rgba(255, 211, 41, 0.1); border-color: var(--tube-yellow); }
+
+        /* BUILDER PILLS */
+        .build-pill { background-color: #111; border: 1px solid #333; color: #f8fafc; padding: 1rem 1.5rem; font-family: 'JetBrains Mono', monospace; font-weight: bold; font-size: 1.2rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-transform: lowercase;}
+        .build-pill:hover { border-color: var(--tube-yellow); background: rgba(255,211,41,0.1); transform: translateY(-3px); color: var(--tube-yellow);}
+        .build-pill.used { opacity: 0; pointer-events: none; transform: scale(0.8); }
+
+        /* LOGIC BOARD */
+        .node-card { background: #111; border: 1px solid #333; color: #f8fafc; padding: 1.5rem; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: bold; border-radius: 12px; position: relative; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-align: center; text-transform: uppercase;}
+        .node-card:hover:not(.matched) { border-color: var(--tube-blue); transform: scale(1.02); z-index: 20; background: rgba(0,25,168,0.1);}
+        .node-card.active { border-color: var(--tube-yellow); background: rgba(255,211,41,0.15); box-shadow: 0 0 25px rgba(255,211,41,0.3);}
+        .node-card.matched { border-color: var(--tube-green); color: var(--tube-green); background: rgba(0,122,51,0.1); pointer-events: none; opacity: 0.5; }
+
+        /* CORRUPTED NOTES (Departures Board) */
+        .departures-board { font-family: 'JetBrains Mono', monospace; background: #000; padding: 2rem; border: 2px solid #333; border-radius: 12px; color: var(--tube-yellow); text-transform: uppercase; line-height: 2;}
+        .corrupted-word { background-color: var(--tube-red); color: #fff; cursor: pointer; transition: all 0.2s; padding: 2px 10px; border-radius: 4px; animation: blink 2s infinite;}
+        .corrupted-word:hover { background-color: #fff; color: #000; }
+        .corrupted-fixed { background-color: transparent; color: var(--tube-green); pointer-events: none; border-bottom: 2px solid var(--tube-green); font-weight: bold; animation: none;}
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        /* PURE JS LEVER (TUNER) */
+        .lever-container {
+            width: 80px; height: 40px; border-radius: 20px; cursor: pointer; position: relative;
+            transition: background-color 0.3s ease; box-shadow: inset 0 2px 5px rgba(0,0,0,0.5); border: 2px solid #333;
+        }
+        .lever-state-left { background-color: #111; border-color: #333;}
+        .lever-state-right { background-color: var(--tube-green); border-color: var(--tube-green);}
+        .lever-knob {
+            width: 32px; height: 32px; background-color: #fff; border-radius: 50%;
+            position: absolute; top: 2px; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .lever-state-left .lever-knob { transform: translateX(2px); }
+        .lever-state-right .lever-knob { transform: translateX(42px); background-color: #050505;}
+
+        /* MCQ DATA ROWS */
+        .mcq-row { background: #111; border: 1px solid #333; border-radius: 12px; transition: all 0.2s ease; cursor: pointer; display: flex; align-items: center; padding: 1.2rem 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 500; }
+        .mcq-row:hover:not(.locked-check) { border-color: var(--tube-blue); transform: translateX(5px); background: rgba(0,25,168,0.1);}
+        .mcq-row.correct { background: rgba(0, 122, 51, 0.15); border-color: var(--tube-green); color: var(--tube-green); }
+        .mcq-row.wrong { background: rgba(220, 36, 31, 0.15); border-color: var(--tube-red); color: var(--tube-red); }
+
+        /* FLIP CARDS */
+        .flip-card { perspective: 1000px; cursor: pointer; }
+        .flip-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
+        .flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+        .flip-front, .flip-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; background-color: #111; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .flip-back { background: #050505; border-color: var(--tube-yellow); transform: rotateY(180deg); }
+
+        /* FOOTER CONSOLE */
+        #nav-console {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 80px;
+            background: rgba(5, 5, 5, 0.95); border-top: 2px solid var(--tube-blue);
+            display: flex; justify-content: space-between; align-items: center; padding: 0 30px; z-index: 5000;
+            backdrop-filter: blur(12px);
+        }
+
+        /* DRAWERS */
+        .drawer { 
+            background: rgba(5, 5, 5, 0.98); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            color: #f8fafc; border-left: 1px solid var(--tube-blue); transform: translateX(100%); 
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 5100; box-shadow: -20px 0 50px rgba(0,0,0,0.9);
+        }
+        .drawer-left { transform: translateX(-100%); border-left: none; border-right: 1px solid var(--tube-blue); }
+        .drawer.active { transform: translateX(0); }
+
+        /* EFFECTS */
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-2px, 0, 0); } 20%, 80% { transform: translate3d(4px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-6px, 0, 0); } 40%, 60% { transform: translate3d(6px, 0, 0); } }
+        
+        #confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 9999; }
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden text-base">
+
+    <div class="tube-glow"></div>
+    <div class="transit-grid"></div>
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- HUD SUPERIOR -->
+    <div id="hud-top" class="hidden justify-between items-center w-full">
+        <div class="flex items-center gap-10">
+            <div class="flex flex-col gap-1">
+                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">System Integrity (HP)</span>
+                <div class="hud-bar-container"><div id="hp-bar" class="hud-bar-fill bg-[var(--tube-blue)]" style="width: 100%;"></div></div>
+            </div>
+            <div class="flex flex-col gap-1">
+                <span class="text-[10px] font-bold text-[var(--tube-yellow)] uppercase tracking-widest font-mono">Route Progress (XP)</span>
+                <div class="hud-bar-container"><div id="xp-bar" class="hud-bar-fill bg-[var(--tube-yellow)]" style="width: 0%;"></div></div>
+            </div>
+        </div>
+        <div class="text-right flex items-center gap-6">
+            <button onclick="toggleFullscreen()" class="text-gray-400 hover:text-white transition-colors" title="Fullscreen"><i class="fas fa-expand text-lg"></i></button>
+            <div class="text-right hidden sm:block ml-4">
+                <p class="font-heading text-xl font-black text-white tracking-widest leading-none uppercase">WOLF LABS</p>
+                <p class="text-[10px] font-bold text-[var(--tube-blue)] tracking-widest uppercase mt-1 font-mono">Transit Control</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAINEL PRINCIPAL (CAPA) -->
+    <main id="dashboard" class="flex flex-col items-center relative px-8 pt-20 pb-48 z-10 w-full h-screen overflow-y-auto">
+        <div class="max-w-4xl w-full flex flex-col items-center text-center space-y-6 animate-in fade-in my-auto pb-10 relative z-20">
+            
+            <div class="relative w-48 h-48 md:w-56 md:h-56 shrink-0 mb-6">
+                <!-- Tube Logo -->
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="w-full h-full rounded-full border-[16px] border-[var(--tube-red)] flex items-center justify-center bg-[var(--tube-bg)] shadow-[0_0_50px_rgba(220,36,31,0.3)]">
+                        <div class="h-12 w-[110%] bg-[var(--tube-blue)] absolute flex items-center justify-center -mx-4 z-10 shadow-lg">
+                            <span class="text-white font-heading font-bold text-2xl tracking-widest">ROUTE 02</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4 z-20 relative">
+                <span class="bg-[#111] border border-[var(--tube-blue)] text-[var(--tube-blue)] px-3 py-1 font-bold text-[10px] font-mono tracking-widest rounded-sm mb-2 inline-block uppercase">A1 Beginner</span>
+                <h1 class="text-5xl md:text-7xl font-black text-white leading-tight tracking-tighter font-heading uppercase drop-shadow-md">Transit <br><span class="text-[var(--tube-yellow)]">Control</span></h1>
+                <p class="text-xl text-gray-400 font-sans mt-6 max-w-2xl mx-auto leading-relaxed">Dispatch the contestants, connect the tracks, and master <strong class="text-white">Adjectives</strong> and <strong class="text-[var(--tube-yellow)]">Conjunctions (AND / BUT)</strong>.</p>
+            </div>
+            
+            <button onclick="startMission()" class="mt-10 btn-tube px-16 py-5 text-xl flex items-center gap-3 z-20 relative">
+                <i class="fas fa-train-subway"></i> Open Dispatch
+            </button>
+        </div>
+    </main>
+
+    <!-- ARENA DE CONTEÚDO DA LIÇÃO -->
+    <main id="mission-arena" class="hidden flex-grow flex-col overflow-hidden relative mt-16">
+        <div id="mission-content" class="flex-grow overflow-y-auto px-6 py-12 flex flex-col items-center w-full relative z-20"></div>
+    </main>
+
+    <!-- CONSOLA DE NAVEGAÇÃO -->
+    <footer id="nav-console" class="hidden flex justify-between items-center w-full font-mono">
+        <div class="flex items-center gap-6 w-1/4">
+            <button onclick="toggleLessonNavigator()" class="text-gray-400 hover:text-[var(--tube-blue)] transition-colors text-xs font-bold tracking-widest uppercase flex items-center gap-2" title="Directory"><i class="fas fa-route text-lg"></i> Map</button>
+        </div>
+        <div class="flex flex-col items-center gap-3 w-1/2">
+            <div class="flex items-center gap-12">
+                <button onclick="prevStep()" class="text-gray-500 hover:text-white transition-colors"><i class="fas fa-backward-step text-xl"></i></button>
+                <span id="console-counter" class="text-xs font-bold text-gray-400 tracking-widest uppercase">STATION 01</span>
+                <button onclick="nextStep()" class="text-gray-500 hover:text-white transition-all hover:scale-110"><i class="fas fa-forward-step text-xl"></i></button>
+            </div>
+            <div class="w-72 h-1 bg-[#333] rounded overflow-hidden">
+                <div id="progress-bar" class="h-full bg-[var(--tube-blue)] transition-all duration-300 shadow-[0_0_10px_rgba(0,25,168,0.8)]" style="width: 0%;"></div>
+            </div>
+        </div>
+        <div class="flex items-center justify-end gap-6 w-1/4">
+            <button onclick="toggleTeacherHUD()" class="text-gray-400 hover:text-white transition-colors text-xs font-bold tracking-widest uppercase mr-4" title="Control Room"><i class="fas fa-tower-cell text-lg"></i></button>
+            <button onclick="toggleWhiteboard()" class="text-gray-400 hover:text-white transition-colors text-xs font-bold tracking-widest uppercase flex items-center gap-2" title="Notes"><i class="fas fa-clipboard-list text-lg"></i> Log</button>
+        </div>
+    </footer>
+
+    <!-- GAVETAS LATERAIS -->
+    <aside id="lesson-navigator" class="fixed left-0 top-0 h-screen w-80 drawer drawer-left flex flex-col pt-20 z-[5100]">
+        <div class="p-6 border-b border-[#333] text-white font-bold uppercase tracking-widest flex justify-between items-center text-xl font-heading bg-[#111]">
+            Stations <button onclick="toggleLessonNavigator()"><i class="fas fa-xmark text-gray-500 hover:text-white"></i></button>
+        </div>
+        <div id="nav-steps-list" class="flex-grow overflow-y-auto p-4 space-y-2 bg-[var(--tube-bg)] font-mono"></div>
+        <button onclick="goHome()" class="p-5 bg-[#111] text-[var(--tube-red)] font-bold text-center border-t border-[#333] hover:bg-[var(--tube-red)] hover:text-white transition-all uppercase tracking-widest text-xs font-mono"><i class="fas fa-power-off mr-2"></i> End Shift</button>
+    </aside>
+
+    <aside id="whiteboard" class="fixed right-0 top-0 h-screen w-[450px] drawer flex flex-col pt-20 z-[5100]">
+        <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#111]">
+            <h2 class="font-heading text-2xl font-bold text-white tracking-widest uppercase"><i class="fas fa-clipboard-list text-[var(--tube-yellow)] mr-3"></i>Dispatch Log</h2>
+            <button onclick="toggleWhiteboard()" class="text-gray-500 hover:text-white"><i class="fas fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-4 bg-[var(--tube-panel)] flex flex-wrap gap-2 border-b border-[#333] font-mono">
+            <button onclick="insertTag('// BUT = Contrast')" class="text-[10px] bg-[#050505] border border-[#333] text-gray-400 px-3 py-1.5 rounded hover:bg-[var(--tube-red)] hover:text-white transition-all font-bold uppercase tracking-widest">BUT</button>
+            <button onclick="insertTag('// AND = Addition')" class="text-[10px] bg-[#050505] border border-[#333] text-gray-400 px-3 py-1.5 rounded hover:bg-[var(--tube-blue)] hover:text-white transition-all font-bold uppercase tracking-widest">AND</button>
+        </div>
+        <textarea id="wb-text" class="flex-grow bg-[#050505] text-[var(--tube-yellow)] p-8 resize-none focus:outline-none font-mono text-sm leading-relaxed" spellcheck="false" placeholder="> Input route notes here..._"></textarea>
+    </aside>
+
+    <aside id="teacher-hud" class="fixed right-0 top-0 h-screen w-[350px] drawer flex flex-col pt-20 z-[5100]">
+        <div class="p-6 border-b border-[#333] flex justify-between items-center bg-[#111]">
+            <h2 class="font-heading text-2xl font-bold text-white tracking-widest uppercase"><i class="fas fa-tower-cell mr-3 text-[var(--tube-blue)]"></i>Control Room</h2>
+            <button onclick="toggleTeacherHUD()"><i class="fas fa-xmark text-xl text-gray-500 hover:text-white"></i></button>
+        </div>
+        <div class="flex-grow overflow-y-auto p-6 space-y-8 bg-[var(--tube-panel)]">
+            <div class="bg-[#111] p-6 rounded-lg border border-[#333] shadow-sm">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 font-mono">Module Goal</p>
+                <p class="text-sm text-gray-300 leading-relaxed font-sans">Level A1. Master basic transport adjectives (fast, slow, cheap, expensive) and coordinate ideas using <strong class="text-[var(--tube-yellow)]">AND</strong> / <strong class="text-[var(--tube-yellow)]">BUT</strong>.</p>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 font-mono">Live Feedback</p>
+                <div class="space-y-3 font-heading tracking-wider">
+                    <button onclick="triggerPraise('GREEN SIGNAL', 'Excellent Grammar.')" class="w-full py-4 bg-transparent text-[var(--tube-green)] border border-[var(--tube-green)] rounded-full font-bold text-sm hover:bg-[var(--tube-green)] hover:text-[#050505] transition-all uppercase">GREEN (GRAMMAR)</button>
+                    <button onclick="triggerPraise('ALL CLEAR', 'Great Speaking.')" class="w-full py-4 bg-transparent text-[var(--tube-blue)] border border-[var(--tube-blue)] rounded-full font-bold text-sm hover:bg-[var(--tube-blue)] hover:text-white transition-all uppercase">BLUE (SPEAKING)</button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Overlay de Elogio -->
+    <div id="praise-overlay" class="fixed inset-0 z-[6000] flex items-center justify-center bg-[#050505]/95 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300 p-4">
+        <div id="praise-card" class="text-center transform scale-50 transition-transform duration-500">
+            <div class="w-48 h-48 rounded-full border-[12px] border-[var(--tube-green)] mx-auto mb-8 flex items-center justify-center shadow-[0_0_60px_rgba(0,122,51,0.5)] bg-[#111] relative overflow-hidden" id="praise-circle">
+                <i class="fas fa-check text-7xl text-[var(--tube-green)] relative z-10" id="praise-icon"></i>
+            </div>
+            <h2 id="praise-main" class="font-heading text-6xl md:text-8xl font-black tracking-widest uppercase mb-4 text-white drop-shadow-md"></h2>
+            <p id="praise-sub" class="text-xl font-mono tracking-widest uppercase mt-6 text-[var(--tube-yellow)]"></p>
+        </div>
+    </div>
+
+    <!-- SCRIPT DO MOTOR PRINCIPAL -->
+    <script>
+        let state = { hp: 100, xp: 0, current: 0 };
+        const esc = (s) => s ? s.replace(/'/g, "\\'").replace(/"/g, "&quot;") : "";
+        const TYPES = { COVER: "Briefing", WARMUP: "Check", VOCAB: "Assets", VIDEO: "CCTV", GRAMMAR: "Protocol", BUILDER: "Code", GAME: "Track Switch", SPEAKING: "Comms", DRILL: "System", WRAP: "End Route" };
+
+        function step(type, title, html) { return { type, title, html }; }
+
+        function updateHUD() {
+            const h = document.getElementById('hp-bar'); if(h) h.style.width = Math.max(0, state.hp) + '%';
+            const x = document.getElementById('xp-bar'); if(x) x.style.width = Math.min(100, (state.xp / 120) * 100) + '%';
+            const sCount = document.getElementById('console-counter'); if(sCount) sCount.innerText = `STATION ${String(state.current + 1).padStart(2, '0')}/${lessonData.length}`;
+            const pBar = document.getElementById('progress-bar'); if(pBar) pBar.style.width = `${((state.current + 1) / lessonData.length) * 100}%`;
+
+            const navList = document.getElementById('nav-steps-list');
+            if (navList) {
+                Array.from(navList.children).forEach((btn, i) => {
+                    if(i === state.current) { btn.classList.add('bg-[#111]', 'text-white', 'border-l-4', 'border-[var(--tube-blue)]'); btn.classList.remove('text-gray-500'); } 
+                    else { btn.classList.remove('bg-[#111]', 'text-white', 'border-l-4', 'border-[var(--tube-blue)]'); btn.classList.add('text-gray-500'); }
+                });
+            }
+        }
+
+        function insertTag(tag) { 
+            const text = document.getElementById('wb-text'); 
+            if (text) { text.value += (text.value.length > 0 ? '\n' : '') + tag + ' '; text.focus(); } 
+        }
+
+        // --- TEMPLATES TUBE THEME ---
+        
+        const bGuide = (title, points, icon="fa-train-subway") => step(TYPES.COVER, title, `
+            <div class="max-w-4xl mx-auto space-y-10 animate-in fade-in py-10 w-full">
+                <div class="tube-panel p-10 md:p-14 text-center">
+                    <div class="w-24 h-24 bg-[var(--tube-bg)] rounded-full flex items-center justify-center mx-auto mb-8 border-4 border-[var(--tube-blue)] shadow-[0_0_30px_rgba(0,25,168,0.5)]">
+                        <i class="fas ${icon} text-4xl text-[var(--tube-blue)]"></i>
+                    </div>
+                    <h2 class="font-heading text-4xl md:text-6xl font-black text-white tracking-widest mb-10 uppercase">${title}</h2>
+                    <div class="space-y-6 text-left max-w-2xl mx-auto bg-[#050505] p-8 rounded-xl border border-[#333] shadow-inner">
+                        <p class="font-mono text-[var(--tube-yellow)] text-xs uppercase font-bold tracking-widest mb-4 border-b border-[#333] pb-2">Route Details</p>
+                        ${points.map(p => `<p class="text-xl text-gray-300 font-sans leading-relaxed flex items-start gap-4"><i class="fas fa-circle text-[var(--tube-blue)] mt-2 text-[10px]"></i> ${p}</p>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `);
+
+        const bSlider = (title, prompt, optA, optB, questions, starters) => step(TYPES.WARMUP, title, `
+            <div class="max-w-5xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center space-y-10 animate-in fade-in w-full">
+                <p class="text-xs font-bold text-[var(--tube-yellow)] uppercase tracking-widest font-mono bg-[#111] px-4 py-1.5 border border-[#333] rounded-full">Routine Check</p>
+                <h2 class="font-heading text-4xl md:text-5xl font-bold text-white tracking-widest uppercase">${prompt}</h2>
+                
+                <div class="w-full max-w-3xl tube-panel py-12 flex flex-col items-center mt-6">
+                    <div class="w-full px-12 relative mb-6">
+                        <input type="range" min="0" max="100" value="50" class="tube-slider">
+                    </div>
+                    <div class="flex justify-between w-full px-8 text-sm font-bold uppercase tracking-widest font-mono">
+                        <span class="text-gray-500">${optA}</span>
+                        <span class="text-[var(--tube-white)]">${optB}</span>
+                    </div>
+                </div>
+
+                <div class="w-full max-w-4xl p-8 mt-8 text-left border-l-4 border-[var(--tube-blue)] bg-[#111] rounded shadow-lg flex flex-col md:flex-row gap-10">
+                    <div class="flex-1">
+                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 font-mono">Questions</p>
+                        <div class="space-y-5">
+                            ${questions.map(q => `<p class="text-xl font-sans text-white leading-snug"><i class="fas fa-comment-dots text-[var(--tube-blue)] mr-3 opacity-80"></i>${q}</p>`).join('')}
+                        </div>
+                    </div>
+                    <div class="flex-1 border-t md:border-t-0 md:border-l border-[#333] pt-6 md:pt-0 md:pl-10">
+                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 font-mono">Your Answer</p>
+                        <div class="space-y-6">
+                            ${starters.map(s => `<p class="text-xl text-gray-400 font-mono italic">"${s}"</p>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+
+        // VISUAL MATCH (DRAG TO POLAROIDS)
+        const bVisualMatch = (id, title, instruction, items) => {
+            const expectedStr = JSON.stringify(items.map(i => i.word)).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            let words = shuffleArray([...items]).map(w => `
+                <div class="vocab-word" draggable="true" ondragstart="dragVocabMatch(event, this)" ondragend="this.classList.remove('dragging')" data-word="${esc(w.word)}">
+                    ${w.word}
+                </div>
+            `).join('');
+
+            let dropzones = items.map((w, i) => `
+                <div class="tube-panel h-[280px] flex flex-col items-center justify-center p-6 border border-[#333] shadow-sm">
+                    <div class="w-full h-32 bg-[#050505] rounded-xl mb-6 flex items-center justify-center border border-[#333] shadow-inner">
+                        <i class="fas ${w.icon} text-5xl text-gray-600"></i>
+                    </div>
+                    <div class="vocab-match-dropzone w-full h-14 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center font-mono font-bold text-gray-500 tracking-widest uppercase transition-all duration-300" data-expected="${esc(w.word)}" ondrop="dropVocabMatch(event, this, '${id}')" ondragover="allowDropVocabMatch(event)" ondragleave="leaveDropVocabMatch(event)">
+                        Label
+                    </div>
+                </div>
+            `).join('');
+
+            return step(TYPES.VOCAB, title, `
+                <div class="max-w-5xl mx-auto flex flex-col items-center py-10 animate-in fade-in w-full" id="vmatch-container-${id}">
+                    <p class="text-[10px] font-bold text-[var(--tube-bg)] uppercase tracking-widest mb-6 bg-[var(--tube-yellow)] px-4 py-1.5 rounded-full font-mono">Data Entry</p>
+                    <h2 class="font-heading text-4xl md:text-5xl font-bold text-white tracking-widest mb-8 text-center uppercase">${title}</h2>
+                    <p class="text-gray-400 text-xl font-medium mb-10 text-center max-w-2xl">${instruction}</p>
+                    
+                    <div class="w-full flex justify-center flex-wrap gap-4 mb-12" id="vmatch-bank-${id}">
+                        ${words}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-5xl" id="vmatch-grid-${id}">
+                        ${dropzones}
+                    </div>
+                    
+                    <div id="vmatch-fb-${id}" class="hidden mt-10 text-[var(--tube-bg)] font-mono font-bold text-sm bg-[var(--tube-yellow)] px-6 py-3 rounded-full uppercase tracking-widest shadow-md"><i class="fas fa-check-circle mr-2"></i> Labels matched successfully.</div>
+                </div>
+            `);
+        };
+
+        const bVideo = (title, videoId, start, end, instruction) => {
+            const endParam = end ? `&end=${end}` : '';
+            return step(TYPES.VIDEO, title, `
+                <div class="max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[60vh] py-10 animate-in fade-in w-full">
+                    <p class="text-[10px] font-bold text-white uppercase tracking-widest mb-4 bg-[var(--tube-blue)] px-4 py-1.5 rounded-full font-mono"><i class="fas fa-video mr-2"></i> CCTV Feed</p>
+                    <h2 class="font-heading text-4xl md:text-5xl font-black text-white tracking-widest mb-8 text-center uppercase">${title}</h2>
+                    
+                    <div class="w-full aspect-video border-4 border-[#333] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-black overflow-hidden mb-8 relative z-10">
+                        <div class="absolute top-4 left-4 flex items-center gap-2 z-20 bg-black/80 border border-[#333] px-3 py-1 rounded-sm shadow-lg backdrop-blur-sm">
+                            <div class="w-2 h-2 rounded-full bg-[var(--tube-red)] animate-pulse"></div>
+                            <span class="text-white font-mono text-xs font-bold tracking-widest uppercase">REC</span>
+                        </div>
+                        <iframe class="w-full h-full relative z-10" src="https://www.youtube.com/embed/${videoId}?start=${start}${endParam}&rel=0&modestbranding=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    </div>
+                    
+                    <div class="tube-panel w-full text-center p-6 !border-t-0 bg-[#111]">
+                        <p class="text-gray-300 font-sans text-xl"><i class="fas fa-ear-listen text-[var(--tube-yellow)] mr-3"></i> ${instruction}</p>
+                    </div>
+                </div>
+            `);
+        };
+
+        const bConsultQuiz = (id, title, prompt, options, correctIdx) => step(TYPES.DRILL, title, `
+            <div class="max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 animate-in fade-in w-full">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 bg-[#111] border border-[#333] px-4 py-1.5 rounded-full font-mono">Fact Check</p>
+                <h2 class="font-heading text-3xl md:text-5xl font-bold text-white tracking-widest uppercase max-w-3xl">${prompt}</h2>
+                
+                <div class="w-full max-w-2xl space-y-4 mt-8">
+                    ${options.map((opt, i) => `
+                        <div class="mcq-row locked-check group" onclick="handleQuizTrial('${id}', this, ${i === correctIdx})">
+                            <div class="w-12 h-12 border border-[#333] bg-[#050505] flex items-center justify-center text-lg font-bold text-gray-500 mr-6 font-mono group-hover:border-[var(--tube-blue)] transition-colors rounded-full">${String.fromCharCode(65 + i)}</div>
+                            <span class="text-xl font-sans text-white text-left">${opt}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `);
+
+        const bTrackSwitcher = (id, title, instruction, phrase1, phrase2, expectedConj) => {
+            let pills = shuffleArray(['AND', 'BUT']).map(w => `
+                <div class="track-pill" draggable="true" ondragstart="dragTrack(event, this)" ondragend="this.classList.remove('dragging')" data-word="${w}">${w}</div>
+            `).join('');
+
+            return step(TYPES.GAME, title, `
+                <div class="max-w-5xl mx-auto w-full flex flex-col items-center justify-center min-h-[60vh] py-10 animate-in fade-in" id="track-container-${id}">
+                    <p class="text-xs font-bold text-[#050505] uppercase tracking-widest mb-4 bg-[var(--tube-yellow)] px-4 py-1.5 rounded-full font-mono"><i class="fas fa-code-branch mr-2"></i> Track Switcher</p>
+                    <h2 class="font-heading text-4xl md:text-5xl font-bold text-white tracking-widest mb-4 text-center uppercase">${title}</h2>
+                    <p class="text-gray-400 font-sans text-xl mb-16 text-center max-w-2xl">${instruction}</p>
+                    
+                    <div class="w-full max-w-md mb-16 flex justify-center gap-8" id="track-bank-${id}">
+                        ${pills}
+                    </div>
+
+                    <div class="track-container">
+                        <div class="track-line-bg">
+                            <div class="track-light" id="track-light-${id}"></div>
+                        </div>
+                        <i class="fas fa-train train-icon" id="train-${id}"></i>
+                        
+                        <div class="track-node text-white">${phrase1}</div>
+                        
+                        <div class="track-dropzone" data-expected="${expectedConj}" ondrop="dropTrack(event, this, '${id}')" ondragover="allowDropTrack(event)" ondragleave="leaveDropTrack(event)">
+                            ...
+                        </div>
+                        
+                        <div class="track-node text-white">${phrase2}</div>
+                    </div>
+                </div>
+            `);
+        };
+
+        const bGrammar = (title, context, structure, examples) => step(TYPES.GRAMMAR, title, `
+            <div class="max-w-5xl mx-auto space-y-10 animate-in fade-in py-10 w-full">
+                <div class="text-center space-y-4 mb-12">
+                    <p class="text-xs font-bold text-white uppercase tracking-widest mb-2 bg-[var(--tube-blue)] inline-block px-4 py-1.5 rounded-full font-mono">Syntax Rules</p>
+                    <h2 class="font-heading text-4xl md:text-5xl font-bold text-white tracking-widest uppercase">${title}</h2>
+                </div>
+                
+                <div class="tube-panel p-10">
+                    <p class="text-2xl font-sans text-gray-300 mb-8 leading-relaxed text-center">${context}</p>
+                    <div class="bg-[#050505] p-8 rounded-xl border border-[#333] shadow-inner">
+                        <p class="text-center font-mono text-3xl text-[var(--tube-yellow)] tracking-widest font-bold uppercase">${structure}</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+                    ${examples.map(ex => `
+                        <div class="bg-[#111] border border-[#333] p-8 rounded-xl shadow-lg text-center hover:border-[var(--tube-blue)] transition-colors">
+                            <p class="text-2xl font-mono text-gray-300 leading-relaxed">"${ex.text.replace(/\[(.*?)\]/g, `<span class="text-[var(--tube-yellow)] font-bold">$1</span>`)}"</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `);
+
+        // PURE JS LEVER
+        const bTuner = (id, title, instruction, textAff, textAlt, feedback) => step(TYPES.DRILL, title, `
+            <div class="max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center space-y-10 animate-in fade-in w-full">
+                <p class="text-[10px] font-bold text-[var(--tube-red)] uppercase tracking-widest mb-4 bg-[var(--tube-red)]/10 px-4 py-1.5 rounded-full font-mono border border-[var(--tube-red)]/20">System Error</p>
+                <h2 class="font-heading text-4xl md:text-5xl font-bold text-white tracking-widest leading-tight uppercase">${title}</h2>
+                <p class="text-xl font-sans text-gray-400 max-w-2xl">${instruction}</p>
+                
+                <div class="w-full max-w-3xl tube-panel flex flex-col items-center py-16 px-10 relative mt-8 border-t-4 border-[var(--tube-red)]">
+                    <div class="flex items-center gap-8 mb-16 w-full justify-center">
+                        <span class="font-bold text-[var(--tube-red)] tracking-widest text-sm w-24 text-right uppercase font-mono transition-colors" id="mode-aff-${id}">Bug</span>
+                        
+                        <!-- PURE JS LEVER -->
+                        <div class="lever-container lever-state-left" id="lever-${id}" onclick="toggleLeverTuner('${id}', '${esc(textAff)}', '${esc(textAlt)}', '${esc(feedback)}')">
+                            <div class="lever-knob"></div>
+                        </div>
+
+                        <span class="font-bold text-gray-500 tracking-widest text-sm w-24 text-left uppercase font-mono transition-colors" id="mode-alt-${id}">Fix</span>
+                    </div>
+
+                    <div class="bg-[#050505] w-full p-10 flex items-center justify-center min-h-[140px] rounded-2xl border border-[#333] shadow-inner">
+                        <p id="tuner-text-${id}" class="text-3xl font-medium transition-opacity duration-300 font-mono text-white tracking-wide uppercase">"${textAff.replace(/\[(.*?)\]/g, `<span class="text-[var(--tube-red)] underline decoration-wavy">$1</span>`)}"</p>
+                    </div>
+                    
+                    <div id="tuner-fb-${id}" class="hidden mt-10 font-bold text-xs font-mono text-[var(--tube-bg)] bg-[var(--tube-green)] px-6 py-3 rounded-full uppercase tracking-widest shadow-lg">
+                        <i class="fas fa-check-circle mr-2"></i> ${feedback}
+                    </div>
+                </div>
+            </div>
+        `);
+
+        const bWordBuilder = (id, title, instruction, expectedArr) => {
+            const expectedStr = JSON.stringify(expectedArr).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            let wordBtns = shuffleArray([...expectedArr]).map(w => `<span class="build-pill" onclick="moveTypeWord(this, '${esc(w)}', '${id}')">${w}</span>`).join('');
+            return step(TYPES.BUILDER, title, `
+                <div class="max-w-4xl mx-auto w-full flex flex-col items-center py-10 animate-in fade-in" data-expected="${expectedStr}" id="wb-data-${id}">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 bg-[#111] px-4 py-1.5 rounded-full font-mono border border-[#333]">Code Input</p>
+                    <h2 class="font-heading text-4xl md:text-5xl font-black text-white tracking-widest mb-8 text-center uppercase">${title}</h2>
+                    <p class="text-gray-400 font-sans text-xl mb-14 text-center">${instruction}</p>
+                    
+                    <div class="w-full tube-panel text-center pb-14 pt-10 px-8">
+                        <div id="wb-dropzone-${id}" class="min-h-[140px] bg-[#050505] rounded-2xl border-2 border-dashed border-[#3f3f46] flex flex-wrap gap-4 items-center justify-center p-8 mb-12 transition-all"></div>
+                        <div class="flex justify-center flex-wrap gap-4 w-full" id="wb-bank-${id}">
+                            ${wordBtns}
+                        </div>
+                        <div class="mt-12 flex justify-between items-center px-4">
+                            <button onclick="resetWb('${id}')" class="text-sm font-bold text-gray-500 hover:text-[var(--tube-red)] uppercase tracking-widest transition font-mono"><i class="fas fa-undo mr-2"></i>Reset</button>
+                            <button id="wb-fb-${id}" class="hidden text-sm font-bold text-[var(--tube-green)] uppercase tracking-widest font-mono pointer-events-none"><i class="fas fa-check-circle mr-2"></i>Compiled</button>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+
+        const bRedactedNotes = (id, title, instruction, text, expectedFixes) => {
+            let expectedFixesCopy = [...expectedFixes]; 
+            let htmlText = text.replace(/\[(.*?)\]/g, (match, word) => {
+                const fixData = expectedFixesCopy.shift();
+                return `<span class="corrupted-word" onclick="triggerFixer(this, '${esc(fixData)}')">[ ERROR ]</span>`;
+            });
+
+            return step(TYPES.DRILL, title, `
+                <div class="max-w-4xl mx-auto w-full flex flex-col items-center py-10 animate-in fade-in">
+                    <p class="text-[10px] font-bold text-white uppercase tracking-widest mb-6 bg-[var(--tube-red)] px-4 py-1.5 rounded-full font-mono shadow-sm">System Error</p>
+                    <h2 class="font-heading text-4xl md:text-5xl font-black text-white tracking-widest mb-8 text-center uppercase">${title}</h2>
+                    <p class="text-gray-400 font-sans text-xl mb-12 text-center">${instruction}</p>
+                    
+                    <div class="w-full relative overflow-hidden p-0 departures-board shadow-[0_0_40px_rgba(220,36,31,0.3)] bg-[#050505]">
+                        <div class="border-b border-[#333] pb-4 mb-6 flex justify-between items-center text-gray-500 font-bold text-sm">
+                            <span>DEPARTURES LOG</span>
+                            <span class="text-[var(--tube-red)] animate-pulse"><i class="fas fa-triangle-exclamation mr-2"></i> NETWORK FAULT</span>
+                        </div>
+                        <div class="text-2xl">${htmlText}</div>
+                        
+                        <div id="fix-panel" class="absolute bottom-0 left-0 w-full bg-[#111] border-t-2 border-[var(--tube-yellow)] p-6 transform translate-y-full transition-transform duration-300 flex items-center gap-4 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.9)]">
+                            <span class="text-[var(--tube-yellow)] font-bold text-sm uppercase tracking-widest font-mono">> Override:</span>
+                            <input type="text" id="fix-input" class="bg-[#050505] text-white border border-[#3f3f46] px-4 py-3 flex-1 text-xl focus:outline-none focus:border-[var(--tube-yellow)] font-mono rounded-lg" autocomplete="off" placeholder="_">
+                            <button onclick="submitFixer()" class="btn-tube-outline px-8 py-3 text-sm !border-[var(--tube-yellow)] !text-[var(--tube-yellow)] hover:!bg-[var(--tube-yellow)] hover:!text-black">Patch</button>
+                        </div>
+                    </div>
+                    <div id="fixer-hub" class="hidden mt-10 text-[var(--tube-green)] font-mono font-bold text-sm tracking-widest uppercase"><i class="fas fa-check-circle mr-2"></i> System repaired.</div>
+                </div>
+            `);
+        }
+
+        const bRoleplay = (title, instruction, prompts) => step(TYPES.SPEAKING, title, `
+            <div class="max-w-5xl mx-auto flex flex-col items-center py-10 animate-in fade-in w-full">
+                <p class="text-[10px] font-bold text-white uppercase tracking-widest mb-6 bg-[var(--tube-blue)] px-4 py-1.5 rounded-full font-mono shadow-sm">Live Comms</p>
+                <h2 class="font-heading text-4xl md:text-5xl font-black text-white tracking-widest mb-6 text-center uppercase">${title}</h2>
+                <p class="text-gray-400 text-xl font-sans mb-14 text-center max-w-3xl">${instruction}</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-10 w-full max-w-4xl">
+                    ${prompts.map((p, idx) => `
+                        <div class="flip-card w-full h-[300px]" onclick="this.classList.toggle('flipped')">
+                            <div class="flip-inner">
+                                <div class="flip-front">
+                                    <i class="fas fa-headset text-6xl text-gray-600 mb-8"></i>
+                                    <p class="font-heading text-white text-2xl font-bold tracking-widest uppercase mb-2">Comm #${idx + 1}</p>
+                                    <p class="text-xs text-gray-500 mt-2 font-mono uppercase tracking-widest">Connect</p>
+                                </div>
+                                <div class="flip-back">
+                                    <i class="fas fa-microphone text-3xl text-[var(--tube-blue)] mb-6 opacity-30"></i>
+                                    <p class="text-2xl font-sans font-medium text-white leading-relaxed">"${p}"</p>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `);
+
+        const bDebateFlip = (title, instruction, cards) => step(TYPES.SPEAKING, title, `
+            <div class="max-w-5xl mx-auto flex flex-col items-center py-10 animate-in fade-in w-full">
+                <p class="text-[10px] font-bold text-white uppercase tracking-widest mb-6 bg-[var(--tube-blue)] px-4 py-1.5 rounded-full font-mono shadow-sm">Dispatcher Talk</p>
+                <h2 class="font-heading text-4xl md:text-5xl font-black text-white tracking-widest mb-4 text-center uppercase">${title}</h2>
+                <p class="text-gray-400 text-xl font-sans mb-12 text-center max-w-2xl">${instruction}</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-10 w-full max-w-4xl">
+                    ${cards.map((card, idx) => `
+                        <div class="flip-card w-full h-[250px]" onclick="this.classList.toggle('flipped')">
+                            <div class="flip-inner">
+                                <div class="flip-front">
+                                    <i class="fas fa-comments text-5xl text-[var(--tube-blue)] mb-6 opacity-80"></i>
+                                    <p class="font-mono text-gray-400 font-bold tracking-widest uppercase">Topic ${idx + 1}</p>
+                                </div>
+                                <div class="flip-back">
+                                    <p class="text-2xl font-sans font-medium text-white leading-relaxed">"${card}"</p>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `);
+
+        const bWrap = () => step(TYPES.WRAP, "Shift Ended", `
+            <div class="text-center max-w-3xl mx-auto flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in">
+                <div class="w-36 h-36 bg-[#111] rounded-full border-4 border-[var(--tube-blue)] flex items-center justify-center mb-10 shadow-[0_0_50px_rgba(0,25,168,0.4)] relative">
+                    <div class="absolute inset-2 border border-dashed border-white/20 rounded-full animate-spin-slow"></div>
+                    <i class="fas fa-power-off text-6xl text-[var(--tube-blue)] relative z-10"></i>
+                </div>
+                <h1 class="font-heading text-6xl md:text-8xl font-black text-white tracking-tighter mb-6 uppercase">Shift <br> Ended</h1>
+                <p class="text-2xl text-gray-400 mb-14 font-sans max-w-xl mx-auto leading-relaxed">You successfully routed the trains. You mastered <strong class="text-white font-bold">Adjectives</strong> and <strong class="text-[var(--tube-yellow)] font-bold">AND / BUT</strong>.</p>
+                <button onclick="goHome()" class="btn-tube px-14 py-5 shadow-[0_10px_30px_rgba(220,36,31,0.5)]">
+                    Return to Hub
+                </button>
+            </div>
+        `);
+
+        // --- LESSON DATA (ROUTE 02 TRANSIT CONTROL) - EXACTLY 25 STEPS ---
+        const lessonData = [
+            // PHASE 1: Boot & Vocabulary
+            bGuide("Transport Control", [
+                "Module Level: A1 Beginner.", 
+                "Theme: Transit Adjectives (Fast, Slow, Cheap).",
+                "Grammar: Conjunctions (AND vs BUT).",
+                "Mission: Dispatch the contestants safely."
+            ], "fa-route"),
+            
+            bSlider("Routine Check", "How do you travel?", "Bus/Train", "Car/Bike", 
+                ["Do you prefer trains or buses? Why?", "Is public transport good in your city?"],
+                ["I prefer trains because...", "In my city, the bus is..."]
+            ),
+
+            bVisualMatch("vm1", "Transport Data", "Drag the words to the correct transport icons.", [
+                {word: "Train", icon: "fa-train"},
+                {word: "Bus", icon: "fa-bus"},
+                {word: "Bike", icon: "fa-bicycle"},
+                {word: "Taxi", icon: "fa-taxi"}
+            ]),
+
+            bVisualMatch("vm2", "Adjective Terminal", "Drag the adjective to its correct definition.", [
+                {word: "Fast", icon: "fa-bolt"},
+                {word: "Slow", icon: "fa-turtle"},
+                {word: "Cheap", icon: "fa-tag"},
+                {word: "Expensive", icon: "fa-gem"}
+            ]),
+
+            // PHASE 2: The Full Story
+            bVideo("The Journey", "qnLaRJ3rZMk", 0, null, "Watch the full episode. Pay attention to how Bob and Fran travel, and the problems they face!"),
+
+            bConsultQuiz("q1", "System Check", "Who takes the train?", [
+                "Fran",
+                "Bob",
+                "Paula"
+            ], 1),
+
+            bConsultQuiz("q2", "System Check", "Who takes the bicycle?", [
+                "Fran",
+                "Bob",
+                "Paula"
+            ], 0),
+
+            // PHASE 3: The Logic of BUT
+            bGrammar("Rule of BUT", "We use 'BUT' to connect a positive idea and a negative idea (Contrast).", 
+                "[ + ] BUT [ - ]", [
+                {text: "It is fast, [but] it is expensive."},
+                {text: "It is cheap, [but] it is slow."}
+            ]),
+
+            bTrackSwitcher("sw1", "Route 1", "Drag the correct connector to fix the track.", 
+                "The train is expensive.", "It is fast.", "BUT"
+            ),
+
+            bTrackSwitcher("sw2", "Route 2", "Drag the correct connector to fix the track.", 
+                "The bike is cheap.", "It is slow.", "BUT"
+            ),
+
+            bWordBuilder("wb1", "Code Input", "Build the sentence about the bike.", 
+                ["It", "is", "cheap", "but", "slow."]
+            ),
+
+            // PHASE 4: The Logic of AND
+            bVideo("Bob's Disaster", "qnLaRJ3rZMk", 160, 310, "Watch this part again. What happens to Bob's train?"),
+
+            bConsultQuiz("q3", "System Check", "What is the problem with Bob's train?", [
+                "It is very fast.",
+                "It is cancelled.",
+                "He lost his ticket."
+            ], 1),
+
+            bGrammar("Rule of AND", "We use 'AND' to connect two similar ideas (Positive + Positive OR Negative + Negative).", 
+                "[ - ] AND [ - ]", [
+                {text: "It is expensive [and] it is slow."},
+                {text: "It is cheap [and] fast."}
+            ]),
+
+            bTrackSwitcher("sw3", "Route 3", "Drag the correct connector to fix the track for Bob's broken train.", 
+                "The train is expensive.", "It is slow.", "AND"
+            ),
+
+            bWordBuilder("wb2", "Code Input", "Build the sentence about Bob's problem.", 
+                ["The", "train", "is", "expensive", "and", "slow."]
+            ),
+
+            bRedactedNotes("fix1", "Departures Board", "The departures board has a bug. Fix the screen text.", 
+                "Alert: Bob's train is expensive [BUT] slow. Expect delays.", 
+                ["and"]
+            ),
+
+            bTuner("tun1", "Conjunction Switch", "Switch the lever to use the correct word.", 
+                "The train is fast [AND] expensive.", "The train is fast [BUT] expensive.", 
+                "Rule: Fast is good (+), Expensive is bad (-). Use BUT."
+            ),
+
+            bWordBuilder("wb3", "Code Input", "Build the sentence about Fran.", 
+                ["Fran", "is", "cycling."]
+            ),
+
+            // PHASE 5: Live Comms
+            bRoleplay("Comms Link", "Talk to the contestants. Read the text aloud.", [
+                "Bob: 'Oh no! The train is expensive AND it is slow!'",
+                "Fran: 'I am cycling. It is cheap BUT it is slow.'"
+            ]),
+
+            bRoleplay("Call Paula", "Pretend you are Paula. You are still in London.", [
+                "I am Paula.",
+                "I choose the bus. It is slow BUT it is cheap."
+            ]),
+
+            bDebateFlip("City Check", "Flip the cards and talk to your teacher about your city.", [
+                "Is the bus fast or slow in your city?",
+                "Is the train cheap or expensive in your city?"
+            ]),
+
+            bDebateFlip("The Choice", "Flip the cards and talk to your teacher.", [
+                "What is better: Pay more to go fast, or pay less and go slow?",
+                "Do you like cycling?"
+            ]),
+
+            // PHASE 6: Wrap up
+            bSlider("Prediction", "What about Paula?", "Train", "Bus", 
+                ["Paula is still in London. How will she travel?"],
+                ["I think Paula will take the bus because..."]
+            ),
+
+            bWrap()
+        ];
+
+        // --- RUNTIME LOGIC ---
+        
+        // VISUAL MATCH (DRAG & DROP TO POLAROIDS)
+        function dragVocabMatch(e, el) { e.dataTransfer.setData('text', el.dataset.word); el.classList.add('dragging'); }
+        function allowDropVocabMatch(e) { e.preventDefault(); e.currentTarget.classList.add('bg-[#111]', 'border-[var(--tube-yellow)]', 'text-[var(--tube-yellow)]'); }
+        function leaveDropVocabMatch(e) { e.currentTarget.classList.remove('bg-[#111]', 'border-[var(--tube-yellow)]', 'text-[var(--tube-yellow)]'); }
+        function dropVocabMatch(e, zone, id) { 
+            e.preventDefault(); zone.classList.remove('bg-[#111]', 'border-[var(--tube-yellow)]', 'text-[var(--tube-yellow)]'); 
+            const word = e.dataTransfer.getData('text'); 
+            if(word) checkVocabWordMatch(word, zone, id); 
+        }
+        
+        function checkVocabWordMatch(wordStr, zone, id) {
+            const expected = zone.dataset.expected;
+            if(zone.classList.contains('matched')) return;
+
+            if(wordStr === expected) {
+                zone.innerHTML = wordStr;
+                zone.classList.add('matched', 'bg-[var(--tube-yellow)]', 'text-[#050505]', 'border-transparent', 'shadow-md');
+                zone.classList.remove('border-dashed', 'border-gray-600', 'text-gray-500');
+                
+                const pill = document.getElementById(`vmatch-bank-${id}`).querySelector(`[data-word="${wordStr}"]`);
+                if(pill) pill.style.visibility = 'hidden';
+
+                state.xp += 5; updateHUD(); shootConfetti();
+                
+                const grid = document.getElementById(`vmatch-grid-${id}`);
+                const allMatched = Array.from(grid.querySelectorAll('.vocab-match-dropzone')).every(dz => dz.classList.contains('matched'));
+                if(allMatched) {
+                    document.getElementById(`vmatch-fb-${id}`).classList.remove('hidden');
+                }
+                
+            } else {
+                zone.classList.add('shake', 'border-[var(--tube-red)]', 'text-[var(--tube-red)]');
+                state.hp -= 5; updateHUD();
+                
+                setTimeout(() => {
+                    zone.classList.remove('shake', 'border-[var(--tube-red)]', 'text-[var(--tube-red)]');
+                }, 500);
+            }
+        }
+
+        // CUSTOM MECHANIC: THE TRACK SWITCHER (DRAG & DROP)
+        let activeTrackPill = null;
+
+        function dragTrack(e, el) { e.dataTransfer.setData('text', el.dataset.word); el.classList.add('dragging'); }
+        function allowDropTrack(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+        function leaveDropTrack(e) { e.currentTarget.classList.remove('drag-over'); }
+        function dropTrack(e, zone, id) { e.preventDefault(); zone.classList.remove('drag-over'); const word = e.dataTransfer.getData('text'); if(word) checkTrackMatch(word, zone, id); }
+        
+        function checkTrackMatch(wordStr, zone, id) {
+            const expected = zone.dataset.expected;
+            if(zone.classList.contains('filled')) return;
+
+            if(wordStr === expected) {
+                zone.innerHTML = wordStr;
+                zone.classList.add('filled');
+                
+                const light = document.getElementById(`track-light-${id}`);
+                const train = document.getElementById(`train-${id}`);
+                light.style.width = '100%';
+                train.classList.add('run-train');
+                
+                const pill = document.getElementById(`track-bank-${id}`).querySelector(`[data-word="${wordStr}"]`);
+                if(pill) pill.style.display = 'none';
+
+                state.xp += 10; updateHUD(); shootConfetti();
+                
+            } else {
+                zone.innerHTML = wordStr;
+                zone.classList.add('filled-error', 'shake');
+                state.hp -= 10; updateHUD();
+                
+                setTimeout(() => {
+                    zone.classList.remove('filled-error', 'shake');
+                    zone.innerHTML = '...';
+                }, 800);
+            }
+        }
+
+        // Drawers
+        function toggleLessonNavigator() { document.getElementById('lesson-navigator').classList.toggle('active'); document.getElementById('teacher-hud')?.classList.remove('active'); document.getElementById('whiteboard')?.classList.remove('active');}
+        function toggleTeacherHUD() { document.getElementById('teacher-hud').classList.toggle('active'); document.getElementById('lesson-navigator')?.classList.remove('active'); document.getElementById('whiteboard')?.classList.remove('active');}
+        function toggleWhiteboard() { document.getElementById('whiteboard').classList.toggle('active'); document.getElementById('lesson-navigator')?.classList.remove('active'); document.getElementById('teacher-hud')?.classList.remove('active');}
+        
+        function buildLessonNavigator() {
+            const list = document.getElementById('nav-steps-list'); if (!list) return; list.innerHTML = '';
+            lessonData.forEach((step, i) => {
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all text-sm mb-2 border border-transparent ${i === state.current ? 'bg-[#111] text-white font-bold border-[#333] border-l-4 !border-l-[var(--tube-blue)] shadow-sm' : 'text-gray-500 hover:bg-[#111] hover:text-white hover:border-[#333]'}`;
+                btn.innerHTML = `<span class="w-6 opacity-50 font-bold font-mono text-[10px]">${(i+1).toString().padStart(2,'0')}</span><div class="flex flex-col truncate"><span class="truncate font-sans">${step.title}</span></div>`;
+                btn.onclick = () => { state.current = i; renderStep(); toggleLessonNavigator(); };
+                list.appendChild(btn);
+            });
+        }
+
+        // Praise System
+        function triggerPraise(main, sub) {
+            document.getElementById('teacher-hud')?.classList.remove('active'); 
+            const overlay = document.getElementById('praise-overlay'); 
+            const ptMain = document.getElementById('praise-main');
+            const ptSub = document.getElementById('praise-sub');
+            const card = document.getElementById('praise-card');
+            const icon = document.getElementById('praise-icon');
+            
+            ptMain.innerText = main;
+            ptSub.innerText = sub;
+
+            if(main === 'GREEN SIGNAL') {
+                icon.className = "fas fa-check text-7xl text-[var(--tube-green)] relative z-10";
+                document.getElementById('praise-circle').className = "w-48 h-48 rounded-full border-[12px] border-[var(--tube-green)] mx-auto mb-8 flex items-center justify-center shadow-[0_0_60px_rgba(0,122,51,0.5)] bg-[#111] relative overflow-hidden";
+            } else {
+                icon.className = "fas fa-microphone text-7xl text-[var(--tube-blue)] relative z-10";
+                document.getElementById('praise-circle').className = "w-48 h-48 rounded-full border-[12px] border-[var(--tube-blue)] mx-auto mb-8 flex items-center justify-center shadow-[0_0_60px_rgba(0,25,168,0.5)] bg-[#111] relative overflow-hidden";
+            }
+            
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => card.classList.replace('scale-50', 'scale-100'), 50); 
+            shootConfetti();
+            
+            setTimeout(() => { 
+                card.classList.replace('scale-100', 'scale-50'); 
+                overlay.classList.add('opacity-0', 'pointer-events-none'); 
+            }, 2500);
+        }
+
+        function toggleElementClass(id, action, className) {
+            const el = document.getElementById(id);
+            if (el) {
+                if (action === 'add') el.classList.add(className);
+                else if (action === 'remove') el.classList.remove(className);
+            }
+        }
+
+        function startMission() {
+            toggleElementClass('dashboard', 'add', 'hidden'); toggleElementClass('dashboard', 'remove', 'flex');
+            toggleElementClass('hud-top', 'remove', 'hidden'); toggleElementClass('hud-top', 'add', 'flex');
+            toggleElementClass('mission-arena', 'remove', 'hidden'); toggleElementClass('mission-arena', 'add', 'flex');
+            toggleElementClass('nav-console', 'remove', 'hidden'); toggleElementClass('nav-console', 'add', 'flex');
+            buildLessonNavigator(); renderStep();
+        }
+
+        function goHome() {
+            toggleElementClass('dashboard', 'remove', 'hidden'); toggleElementClass('dashboard', 'add', 'flex');
+            toggleElementClass('hud-top', 'add', 'hidden'); toggleElementClass('hud-top', 'remove', 'flex');
+            toggleElementClass('mission-arena', 'add', 'hidden'); toggleElementClass('mission-arena', 'remove', 'flex');
+            toggleElementClass('nav-console', 'add', 'hidden'); toggleElementClass('nav-console', 'remove', 'flex');
+            
+            document.getElementById('lesson-navigator')?.classList.remove('active');
+            document.getElementById('teacher-hud')?.classList.remove('active');
+            document.getElementById('whiteboard')?.classList.remove('active');
+            state.current = 0; updateHUD();
+        }
+
+        function renderStep() {
+            if (!lessonData || !lessonData[state.current]) return;
+            const step = lessonData[state.current];
+            const content = document.getElementById('mission-content'); 
+
+            if(content) content.innerHTML = `<div class="w-full max-w-7xl mx-auto">${step.html}</div>`;
+            updateHUD();
+            
+            if (step.type === TYPES.BUILDER) setTimeout(setupWb, 100);
+        }
+
+        function nextStep() { if (state.current < lessonData.length - 1) { state.current++; renderStep(); } else { goHome(); } }
+        function prevStep() { if (state.current > 0) { state.current--; renderStep(); } }
+        
+        function toggleFullscreen() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(err => console.log(err)); } else { if (document.exitFullscreen) document.exitFullscreen(); } }
+
+        // PURE JS LEVER (TUNER)
+        function toggleLeverTuner(id, textAff, textAlt, feedback) {
+            const container = document.getElementById(`lever-${id}`);
+            const textEl = document.getElementById(`tuner-text-${id}`);
+            const aff = document.getElementById(`mode-aff-${id}`); 
+            const alt = document.getElementById(`mode-alt-${id}`);
+            
+            textEl.style.opacity = 0;
+            setTimeout(() => {
+                if(container.classList.contains('lever-state-left')) {
+                    // Switch to Right (Fixed)
+                    container.classList.replace('lever-state-left', 'lever-state-right');
+                    aff.classList.replace('text-[var(--tube-red)]', 'text-gray-500'); 
+                    alt.classList.replace('text-gray-500', 'text-[var(--tube-green)]');
+                    textEl.innerHTML = textAlt.replace(/\[(.*?)\]/g, `<span class="text-[var(--tube-green)] font-bold">$1</span>`); 
+                    document.getElementById(`tuner-fb-${id}`).classList.remove('hidden');
+                } else {
+                    // Switch to Left (Bug)
+                    container.classList.replace('lever-state-right', 'lever-state-left');
+                    aff.classList.replace('text-gray-500', 'text-[var(--tube-red)]'); 
+                    alt.classList.replace('text-[var(--tube-green)]', 'text-gray-500');
+                    textEl.innerHTML = textAff.replace(/\[(.*?)\]/g, `<span class="text-[var(--tube-red)] underline decoration-wavy">$1</span>`); 
+                    document.getElementById(`tuner-fb-${id}`).classList.add('hidden');
+                }
+                textEl.style.opacity = 1;
+            }, 200);
+        }
+
+        // LÓGICA DA CORREÇÃO DE CÓDIGO (Redacted Notes -> Script Edit)
+        let activeBug = null; let expectedFix = "";
+        function triggerFixer(el, answer) {
+            if(el.classList.contains('corrupted-fixed')) return;
+            activeBug = el; expectedFix = answer;
+            const panel = document.getElementById('fix-panel'); panel.classList.remove('translate-y-full');
+            document.getElementById('fix-input').value = ''; document.getElementById('fix-input').focus();
+        }
+        function submitFixer() {
+            const input = document.getElementById('fix-input').value.trim().toLowerCase();
+            const panel = document.getElementById('fix-panel');
+            if(input === expectedFix.toLowerCase()) {
+                activeBug.innerText = expectedFix.toUpperCase(); activeBug.classList.remove('corrupted-word'); activeBug.classList.add('corrupted-fixed');
+                panel.classList.add('translate-y-full');
+                const container = activeBug.closest('.departures-board');
+                if(container.querySelectorAll('.corrupted-word').length === 0) { shootConfetti(); state.xp += 10; updateHUD(); document.getElementById('fixer-hub').classList.remove('hidden');}
+            } else {
+                const inputEl = document.getElementById('fix-input'); inputEl.classList.add('shake');
+                state.hp -= 10; updateHUD(); setTimeout(() => inputEl.classList.remove('shake'), 400);
+            }
+        }
+        document.getElementById('fix-input')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitFixer(); });
+
+        // LÓGICA DO MCQ
+        function handleQuizTrial(id, row, isCorrect) {
+            if(row.classList.contains('locked-check')) {
+                const parent = row.parentElement; 
+                Array.from(parent.children).forEach(child => { child.onclick = null; child.classList.add('opacity-50', 'cursor-default'); child.classList.remove('locked-check');});
+                row.classList.remove('opacity-50'); 
+                if(isCorrect) { row.classList.add('correct'); state.xp += 5; updateHUD(); shootConfetti(); } 
+                else { row.classList.add('wrong'); state.hp -= 10; updateHUD(); }
+            }
+        }
+
+        // --- WORD BUILDER LOGIC ---
+        let wbState = {};
+        function setupWb() { document.querySelectorAll('[id^="wb-data-"]').forEach(el => { const id = el.id.replace('wb-data-', ''); wbState[id] = { current: [], expected: JSON.parse(el.getAttribute('data-expected')) }; }); }
+        function moveTypeWord(pill, word, id) {
+            if(pill.classList.contains('used') || !wbState[id]) return;
+            wbState[id].current.push(word); pill.classList.add('used');
+            const dz = document.getElementById(`wb-dropzone-${id}`);
+            
+            const newPill = document.createElement('span'); 
+            newPill.className = 'font-mono text-xl text-[var(--tube-yellow)] font-bold bg-[#111] border border-[var(--tube-yellow)] px-4 py-2 rounded-lg shadow-sm lowercase'; 
+            newPill.innerText = word; 
+            dz.appendChild(newPill);
+            
+            if(wbState[id].current.length === wbState[id].expected.length) {
+                if(wbState[id].current.every((val, index) => val === wbState[id].expected[index])) { 
+                    dz.classList.add('border-[var(--tube-green)]', 'bg-[var(--tube-green)]/10');
+                    document.getElementById(`wb-fb-${id}`).classList.remove('hidden'); 
+                    state.xp += 10; updateHUD(); shootConfetti(); 
+                }
+                else { 
+                    dz.classList.add('shake', 'border-[var(--tube-red)]'); 
+                    state.hp -= 10; updateHUD();
+                    setTimeout(() => dz.classList.remove('shake', 'border-[var(--tube-red)]'), 400); 
+                }
+            }
+        }
+        function resetWb(id) {
+            if(!wbState[id]) return;
+            wbState[id].current = []; 
+            const dz = document.getElementById(`wb-dropzone-${id}`);
+            dz.innerHTML = ''; dz.classList.remove('border-[var(--tube-green)]', 'bg-[var(--tube-green)]/10');
+            document.getElementById(`wb-fb-${id}`).classList.add('hidden');
+            document.getElementById(`wb-bank-${id}`).querySelectorAll('.build-pill').forEach(p => p.classList.remove('used'));
+        }
+
+        function shuffleArray(array) {
+            let curId = array.length;
+            while (0 !== curId) { let randId = Math.floor(Math.random() * curId); curId -= 1; let tmp = array[curId]; array[curId] = array[randId]; array[randId] = tmp; }
+            return array;
+        }
+
+        // --- FX ---
+        function shootConfetti() {
+            const cCanvas = document.getElementById('confetti-canvas'); const cCtx = cCanvas.getContext('2d');
+            cCanvas.width = window.innerWidth; cCanvas.height = window.innerHeight;
+            const pieces = []; const colors = ['#dc241f', '#0019a8', '#ffd329', '#f8fafc']; /* Tube Red, Blue, Yellow, White */
+            for(let i=0; i<80; i++) pieces.push({ x: cCanvas.width/2, y: cCanvas.height/2+100, vx: (Math.random()-0.5)*20, vy: (Math.random()-1)*20-5, size: Math.random()*8+4, color: colors[Math.floor(Math.random()*colors.length)], rot: Math.random()*360, rotSpeed: (Math.random()-0.5)*10 });
+            function animateC() {
+                cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height); let active = false;
+                pieces.forEach(p => {
+                    p.x += p.vx; p.y += p.vy; p.vy += 0.5; p.rot += p.rotSpeed; if(p.y < cCanvas.height) active = true;
+                    cCtx.save(); cCtx.translate(p.x, p.y); cCtx.rotate(p.rot*Math.PI/180); cCtx.fillStyle = p.color; 
+                    cCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size); cCtx.restore();
+                });
+                if(active) requestAnimationFrame(animateC); else cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+            }
+            animateC();
+        }
+        
+        window.onload = () => { updateHUD(); goHome(); };
+    </script>
+</body>
+</html>
